@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-root',
-  template: '<app-auth></app-auth>', // just show Auth here
+  template: '<app-auth></app-auth>', 
   styleUrls: ['./app.css'],
    standalone: false
   

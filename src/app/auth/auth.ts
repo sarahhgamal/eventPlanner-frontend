@@ -4,6 +4,7 @@ interface User {
   name: string;
   email: string;
   password: string;
+  role: string;
 }
 
 @Component({
@@ -29,6 +30,8 @@ export class Auth {
   signInErrorMessage = '';
   successMessage = '';
 
+  signUpRole = ''; 
+
   toggleForms(isSignUp: boolean) {
     this.isRightPanelActive = isSignUp;
     this.errorMessage = '';
@@ -37,40 +40,36 @@ export class Auth {
   }
 
   register() {
-    // check for empty fields
-    if (!this.signUpName || !this.signUpEmail || !this.signUpPassword) {
-      this.errorMessage = 'Please fill in all fields.';
-      this.successMessage = '';
-      return;
-    }
-
-    const newUser: User = {
-      name: this.signUpName.trim(),
-      email: this.signUpEmail.trim().toLowerCase(),
-      password: this.signUpPassword
-    };
-
-    let users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
-    if (!Array.isArray(users)) users = [];
-
-    const exists = users.some((u: User) => u.email === newUser.email);
-    if (exists) {
-      this.errorMessage = 'User already registered with this email!';
-      this.successMessage = '';
-      return;
-    }
-
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-
-    // clear inputs
-    this.signUpName = '';
-    this.signUpEmail = '';
-    this.signUpPassword = '';
-
-    this.errorMessage = '';
-    this.successMessage = 'Registration successful! You can now sign in.';
+  if (!this.signUpName || !this.signUpEmail || !this.signUpPassword || !this.signUpRole) {
+    this.errorMessage = 'Please fill in all fields and select a role.';
+    this.successMessage = '';
+    return;
   }
+
+  const newUser: User = {
+    name: this.signUpName,
+    email: this.signUpEmail,
+    password: this.signUpPassword,
+    role: this.signUpRole
+  };
+
+  let users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
+  if (!Array.isArray(users)) {
+    users = [];
+  }
+
+  const exists = users.some((u: User) => u.email === newUser.email);
+  if (exists) {
+    this.errorMessage = 'User already registered with this email!';
+    this.successMessage = '';
+    return;
+  }
+
+  users.push(newUser);
+  localStorage.setItem('users', JSON.stringify(users));
+  this.successMessage = 'Registration successful! You can now sign in.';
+  this.errorMessage = '';
+}
 
   login() {
     // check for empty fields

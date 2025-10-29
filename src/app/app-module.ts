@@ -10,4 +10,5 @@ import { Auth } from './auth/auth';
   imports: [BrowserModule, FormsModule],
   bootstrap: [App]
 })
+
 export class AppModule {}

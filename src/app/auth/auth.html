@@ -1,31 +1,50 @@
 <h2>EventPlanner</h2>
 <div class="container" [class.right-panel-active]="isRightPanelActive">
 
+  <!-- Registration error message shown above Sign Up form -->
+  @if (errorMessage) {
+  <div class="error-message">
+    {{ errorMessage }}
+  </div>
+}
+
+  <!-- Registration success message shown above Sign Up form -->
+  @if (successMessage){
+  <div class="success-message">
+    {{ successMessage }}
+  </div>
+}
+
   <!-- Sign Up Form -->
   <div class="form-container sign-up-container">
-    <form>
+    <form (ngSubmit)="register()" #signUpForm="ngForm">
       <h1>Create Account</h1>
       <span>or use your email for registration</span>
 
-      <input type="text" placeholder="Name" [(ngModel)]="name" />
-      <input type="email" placeholder="Email" [(ngModel)]="email" />
-      <input type="password" placeholder="Password" [(ngModel)]="password" />
-      <button class="ghost" id="signUp" (click)="toggleForms(false)">Sign Up</button>
-      
-      <button>Sign Up</button>
-     
+      <input type="text" placeholder="Name" [(ngModel)]="name" name="name" required />
+      <input type="email" placeholder="Email" [(ngModel)]="email" name="email" required email />
+      <input type="password" placeholder="Password" [(ngModel)]="password" name="password" required />
+      <button type="submit" [disabled]="signUpForm.invalid">Sign Up</button>
     </form>
+  </div>
+
+  <!-- Login error message shown above Sign In form -->
+  <div *ngIf="signInErrorMessage" class="error-message" style="color: red; font-weight: bold; margin-bottom: 15px;">
+    {{ signInErrorMessage }}
+  </div>
+
+  <!-- Login success message shown above Sign In form -->
+  <div *ngIf="successMessage && !signInErrorMessage" class="success-message" style="color: green; font-weight: bold; margin-bottom: 15px;">
+    {{ successMessage }}
   </div>
 
   <!-- Sign In Form -->
   <div class="form-container sign-in-container">
-    <form>
-      <h1>Sign In</h1>
-      <span>or use your account</span>
-      <input type="email" placeholder="Email" />
-      <input type="password" placeholder="Password" />
-      <a href="#">Forgot your password?</a>
-      <button class="ghost" id="signIn" (click)="toggleForms(true)">Sign In</button>
+    <form (ngSubmit)="login()" #signInForm="ngForm">
+      <h1>Sign in</h1>
+      <input type="email" placeholder="Email" [(ngModel)]="email" name="emailLogin" required email />
+      <input type="password" placeholder="Password" [(ngModel)]="password" name="passwordLogin" required />
+      <button type="submit" [disabled]="signInForm.invalid">Sign In</button>
     </form>
   </div>
 
@@ -34,15 +53,15 @@
     <div class="overlay">
       <div class="overlay-panel overlay-left">
         <h1>Welcome Back!</h1>
-        <p>To Sign in, Click Here</p>
-        <button class="ghost" id="signIn" (click)="toggleForms(false)">Sign In</button>
+        <p>To stay connected, sign in with your account</p>
+        <button class="ghost" (click)="toggleForms(false)">Sign In</button>
       </div>
-
       <div class="overlay-panel overlay-right">
-        <h1>Hello!</h1>
-        <p>Enter your personal details and start your journey with us</p>
-        <button class="ghost" id="signUp" (click)="toggleForms(true)">Sign Up</button>
+        <h1>Hello, Friend!</h1>
+        <p>Enter your information to start your journey</p>
+        <button class="ghost" (click)="toggleForms(true)">Sign Up</button>
       </div>
     </div>
   </div>
+
 </div>

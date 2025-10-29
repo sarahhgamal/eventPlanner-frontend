@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { AuthService } from '../../services/auth';
+
 @Component({
   selector: 'app-auth',
   templateUrl: './auth.html',
@@ -14,6 +15,8 @@ export class Auth {
   signUpName = '';
   signUpEmail = '';
   signUpPassword = '';
+  signUpRole = '';
+
   signInEmail = '';
   signInPassword = '';
 
@@ -29,7 +32,7 @@ export class Auth {
   }
 
   register() {
-    if (!this.signUpName || !this.signUpEmail || !this.signUpPassword) {
+    if (!this.signUpName || !this.signUpEmail || !this.signUpPassword || !this.signUpRole) {
       this.errorMessage = 'Please fill in all fields.';
       return;
     }
@@ -38,15 +41,17 @@ export class Auth {
       name: this.signUpName,
       email: this.signUpEmail,
       password: this.signUpPassword,
+      role: this.signUpRole,
     };
+
     console.log('Register payload:', payload);
 
     this.authService.register(payload).subscribe({
       next: (res) => {
         console.log('Register response:', res);
-        this.successMessage = 'Registration successful! You can now sign in.';
+        this.successMessage = res.message || 'Registration successful!';
         this.errorMessage = '';
-        this.signUpName = this.signUpEmail = this.signUpPassword = '';
+        this.signUpName = this.signUpEmail = this.signUpPassword = this.signUpRole = '';
       },
       error: (err) => {
         console.error('Register error:', err);
@@ -61,21 +66,25 @@ export class Auth {
       return;
     }
 
-    this.authService
-      .login({
-        email: this.signInEmail,
-        password: this.signInPassword,
-      })
-      .subscribe({
-        next: (res) => {
-          this.authService.saveToken(res.token);
-          this.successMessage = `Welcome back, ${res.user.name}!`;
-          this.signInErrorMessage = '';
-          this.signInEmail = this.signInPassword = '';
-        },
-        error: (err) => {
-          this.signInErrorMessage = err.error.message || 'Invalid email or password.';
-        },
-      });
+    const payload = {
+      email: this.signInEmail,
+      password: this.signInPassword,
+    };
+
+    console.log('Login payload:', payload);
+
+    this.authService.login(payload).subscribe({
+      next: (res) => {
+        console.log('Login response:', res);
+        this.authService.saveToken(res.token);
+        this.successMessage = res.message || `Welcome back, ${res.user?.name || 'User'}!`;
+        this.signInErrorMessage = '';
+        this.signInEmail = this.signInPassword = '';
+      },
+      error: (err) => {
+        console.error('Login error:', err);
+        this.signInErrorMessage = err.error?.message || 'Invalid email or password.';
+      },
+    });
   }
 }

@@ -15,33 +15,43 @@ interface User {
 export class Auth {
   isRightPanelActive = false;
 
-  name = '';
-  email = '';
-  password = '';
+  // Sign Up
+  signUpName = '';
+  signUpEmail = '';
+  signUpPassword = '';
+
+  // Sign In
+  signInEmail = '';
+  signInPassword = '';
+
+  // Messages
   errorMessage = '';
   signInErrorMessage = '';
   successMessage = '';
 
-
   toggleForms(isSignUp: boolean) {
     this.isRightPanelActive = isSignUp;
     this.errorMessage = '';
-    this.successMessage='';
-    this.signInErrorMessage='';
+    this.successMessage = '';
+    this.signInErrorMessage = '';
   }
 
   register() {
-    const newUser: User = {
-      name: this.name,
-      email: this.email,
-      password: this.password,
+    // check for empty fields
+    if (!this.signUpName || !this.signUpEmail || !this.signUpPassword) {
+      this.errorMessage = 'Please fill in all fields.';
+      this.successMessage = '';
+      return;
+    }
 
+    const newUser: User = {
+      name: this.signUpName.trim(),
+      email: this.signUpEmail.trim().toLowerCase(),
+      password: this.signUpPassword
     };
 
     let users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
-    if (!Array.isArray(users)) {
-      users = [];
-    }
+    if (!Array.isArray(users)) users = [];
 
     const exists = users.some((u: User) => u.email === newUser.email);
     if (exists) {
@@ -52,22 +62,43 @@ export class Auth {
 
     users.push(newUser);
     localStorage.setItem('users', JSON.stringify(users));
-   this.successMessage = 'Registration successful! You can now sign in.';
+
+    // clear inputs
+    this.signUpName = '';
+    this.signUpEmail = '';
+    this.signUpPassword = '';
+
+    this.errorMessage = '';
+    this.successMessage = 'Registration successful! You can now sign in.';
   }
 
   login() {
-    let users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
-    if (!Array.isArray(users)) {
-      users = [];
+    // check for empty fields
+    if (!this.signInEmail || !this.signInPassword) {
+      this.signInErrorMessage = 'Please enter your email and password.';
+      this.successMessage = '';
+      return;
     }
 
-    const foundUser = users.find((u: User) => u.email === this.email && u.password === this.password);
+    let users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
+    if (!Array.isArray(users)) users = [];
+
+    const foundUser = users.find(
+      user =>
+        user.email === this.signInEmail.trim().toLowerCase() &&
+        user.password === this.signInPassword
+    );
+
     if (foundUser) {
       this.signInErrorMessage = '';
       this.successMessage = `Welcome back, ${foundUser.name}!`;
 
+      // clear inputs
+      this.signInEmail = '';
+      this.signInPassword = '';
     } else {
-      this.signInErrorMessage = 'Invalid email or password';
+      this.signInErrorMessage = 'Invalid email or password.';
+      this.successMessage = '';
     }
   }
 }

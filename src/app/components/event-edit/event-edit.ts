@@ -1,22 +1,27 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Output, OnInit, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-event-create',
+  selector: 'app-event-edit',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './event-create.html',
-  styleUrls: ['./event-create.css', '../../shared/style/modal-form.css'],
+  templateUrl: './event-edit.html',
+  styleUrls: ['./event-edit.css', '../../shared/style/modal-form.css'],
 })
-export class EventCreate implements OnInit, OnDestroy {
+export class EventEdit implements OnInit, OnDestroy {
+  @Input() eventId: string = '';
+  @Input() eventData: any = null;
   @Output() close = new EventEmitter<void>();
-  @Output() submitCreate = new EventEmitter<any>();
+  @Output() save = new EventEmitter<any>();
 
   showSuccess = false;
   showError = false;
   errorMessage = '';
   dateError = '';
+  isLoading = false;
+  attendees: string[] = [];
+  attendeeEmail = '';
 
   title = '';
   date = '';
@@ -25,12 +30,22 @@ export class EventCreate implements OnInit, OnDestroy {
   description = '';
 
   ngOnInit() {
-    console.log('EventCreate Modal Opened');
+    console.log('EditEvent Modal Opened with data:', this.eventData);
     document.body.style.overflow = 'hidden';
+
+    // Pre-populate form with existing event data
+    if (this.eventData) {
+      this.title = this.eventData.title || '';
+      this.date = this.eventData.date || '';
+      this.time = this.eventData.time || '';
+      this.location = this.eventData.location || '';
+      this.description = this.eventData.description || '';
+      this.attendees = this.eventData.attendees ? [...this.eventData.attendees] : [];
+    }
   }
 
   ngOnDestroy() {
-    console.log('EventCreate Modal Closed');
+    console.log('EditEvent Modal Closed');
     document.body.style.overflow = 'auto';
   }
 
@@ -39,7 +54,7 @@ export class EventCreate implements OnInit, OnDestroy {
     this.close.emit();
   }
 
-  handleCreateEvent(event: Event) {
+  handleUpdateEvent(event: Event) {
     event.preventDefault();
 
     const title = this.title.trim();
@@ -72,29 +87,22 @@ export class EventCreate implements OnInit, OnDestroy {
       date,
       time,
       location,
-      description
+      description,
+      attendees: this.attendees,
     };
 
-    console.log('Event Data:', eventData);
-    this.submitCreate.emit(eventData);
+    console.log('Updated Event Data:', eventData);
 
+    this.isLoading = true;
     this.showSuccess = true;
 
+    // Parent will handle API call via EventService
     setTimeout(() => {
-      this.resetForm();
-      this.closeModal();
+      this.save.emit(eventData);
+      this.isLoading = false;
+      setTimeout(() => {
+        this.closeModal();
+      }, 500);
     }, 1500);
-  }
-
-  resetForm() {
-    this.title = '';
-    this.date = '';
-    this.time = '';
-    this.location = '';
-    this.description = '';
-    this.showSuccess = false;
-    this.showError = false;
-    this.dateError = '';
-    this.errorMessage = '';
   }
 }

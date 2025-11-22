@@ -1,0 +1,106 @@
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <h2>Edit Event</h2>
+      <button type="button" class="modal-close-btn" (click)="closeModal()">✕</button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <!-- Success Message -->
+      @if (showSuccess) {
+        <div class="success-message show">
+          ✓ Event updated successfully!
+        </div>
+      }
+
+      <!-- Error Message -->
+      @if (showError) {
+        <div class="error-alert">
+          {{ errorMessage }}
+        </div>
+      }
+
+      <form (ngSubmit)="handleUpdateEvent($event)">
+        <!-- Event Title -->
+        <div class="form-group">
+          <label class="form-label">Event Title <span class="required">*</span></label>
+          <input
+            type="text"
+            class="form-input"
+            [(ngModel)]="title"
+            name="title"
+            placeholder="Enter event title"
+            required
+            maxlength="100"
+          >
+        </div>
+
+        <!-- Date and Time Row -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date <span class="required">*</span></label>
+            <input
+              type="date"
+              class="form-input"
+              [class.input-error]="dateError"
+              [(ngModel)]="date"
+              name="date"
+              required
+            >
+            @if (dateError) {
+              <div class="field-error">{{ dateError }}</div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Time <span class="required">*</span></label>
+            <input
+              type="time"
+              class="form-input"
+              [(ngModel)]="time"
+              name="time"
+              required
+            >
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="form-group">
+          <label class="form-label">Location <span class="required">*</span></label>
+          <input
+            type="text"
+            class="form-input"
+            [(ngModel)]="location"
+            name="location"
+            placeholder="Enter location"
+            required
+            maxlength="200"
+          >
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label class="form-label">Description <span class="required">*</span></label>
+          <textarea
+            class="form-textarea"
+            [(ngModel)]="description"
+            name="description"
+            placeholder="Describe your event..."
+            required
+            maxlength="1000"
+          ></textarea>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeModal()" [disabled]="isLoading">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading">
+            {{ isLoading ? 'Updating...' : 'Save Changes' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

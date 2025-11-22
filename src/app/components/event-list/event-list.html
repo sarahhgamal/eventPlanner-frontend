@@ -1,9 +1,20 @@
 <div class="list-container">
     <button class="logout-btn" (click)="logout()">Logout</button>
     <button class="create-btn" (click)="openCreateModal()">Create Event</button>
+    <button class="edit-btn" (click)="openEditModal('id_123', { title: 'Team Building Workshop', date: '2025-11-15', time: '14:00', location: 'Conference Room A', description: 'Workshop description...' })">Edit</button>
 </div>
 
-<!-- Modal Component -->
+<!-- Create Modal -->
 @if (showCreateModal) {
   <app-event-create (close)="closeCreateModal()"></app-event-create>
+}
+
+<!-- Edit Modal -->
+@if (showEditModal) {
+  <app-event-edit 
+    [eventId]="selectedEventId" 
+    [eventData]="selectedEventData"
+    (close)="closeEditModal()"
+    (save)="saveEditEvent($event)">
+  </app-event-edit>
 }

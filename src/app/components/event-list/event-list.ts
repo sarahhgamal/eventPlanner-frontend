@@ -1,4 +1,6 @@
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth/auth';
 
 @Component({
   selector: 'app-event-list',
@@ -7,5 +9,10 @@ import { Component } from '@angular/core';
   styleUrl: './event-list.css',
 })
 export class EventList {
+  constructor(private auth: AuthService, private router: Router) {}
 
+  logout() {
+    this.auth.logout();
+    this.router.navigate(['/auth']);
+  }
 }

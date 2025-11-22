@@ -2,7 +2,7 @@
   <div class="modal" (click)="$event.stopPropagation()">
     <!-- Modal Header -->
     <div class="modal-header">
-      <h2>Create New Event</h2>
+      <h2>Edit Event</h2>
       <button type="button" class="modal-close-btn" (click)="closeModal()">✕</button>
     </div>
 
@@ -11,7 +11,7 @@
       <!-- Success Message -->
       @if (showSuccess) {
         <div class="success-message show">
-          ✓ Event created successfully!
+          ✓ Event updated successfully!
         </div>
       }
 
@@ -22,7 +22,7 @@
         </div>
       }
 
-      <form (ngSubmit)="handleCreateEvent($event)">
+      <form (ngSubmit)="handleUpdateEvent($event)">
         <!-- Event Title -->
         <div class="form-group">
           <label class="form-label">Event Title <span class="required">*</span></label>
@@ -44,6 +44,7 @@
             <input
               type="date"
               class="form-input"
+              [class.input-error]="dateError"
               [(ngModel)]="date"
               name="date"
               required
@@ -94,8 +95,10 @@
 
         <!-- Form Actions -->
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create</button>
+          <button type="button" class="btn btn-secondary" (click)="closeModal()" [disabled]="isLoading">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading">
+            {{ isLoading ? 'Updating...' : 'Save Changes' }}
+          </button>
         </div>
       </form>
     </div>

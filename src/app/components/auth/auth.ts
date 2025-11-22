@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth/auth';
 
 @Component({
   selector: 'app-auth',
-  imports: [FormsModule],
+  standalone: true,
+  imports: [FormsModule, CommonModule],
   templateUrl: './auth.html',
   styleUrls: ['./auth.css']
 })
@@ -31,6 +33,13 @@ export class Auth {
     this.errorMessage = '';
     this.successMessage = '';
     this.signInErrorMessage = '';
+  }
+
+  getErrorMessage(backendError: any): string {
+    if (backendError?.errors && Array.isArray(backendError.errors)) {
+      return backendError.errors.map((err: any) => err.msg).filter(Boolean).join(', ');
+    }
+    return backendError?.message;
   }
 
   register() {
@@ -62,7 +71,7 @@ export class Auth {
       },
       error: (err) => {
         console.error('Register error:', err);
-        this.errorMessage = err.error?.message || 'Registration failed.';
+        this.errorMessage = this.getErrorMessage(err.error) || 'Registeration Failed.';
       },
     });
   }
@@ -94,7 +103,7 @@ export class Auth {
       },
       error: (err) => {
         console.error('Login error:', err);
-        this.signInErrorMessage = err.error?.message || 'Invalid email or password.';
+        this.signInErrorMessage = this.getErrorMessage(err.error) || 'Invalid email or password.';
       },
     });
   }

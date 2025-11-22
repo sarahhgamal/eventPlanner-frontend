@@ -28,6 +28,11 @@ export class EventList {
     this.router.navigate(['/auth']);
   }
 
+  // event details
+  viewEventDetails(eventId: string) {
+    this.router.navigate(['/event-details', eventId]);
+  }
+
   // create event
   openCreateModal() {
     console.log('Opening modal');

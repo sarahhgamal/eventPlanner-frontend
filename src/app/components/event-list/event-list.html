@@ -1,2 +1,9 @@
-<p>event-list works!</p>
-<button (click)="logout()" class="logout-btn">Logout</button>
+<div class="list-container">
+    <button class="logout-btn" (click)="logout()">Logout</button>
+    <button class="create-btn" (click)="openCreateModal()">Create Event</button>
+</div>
+
+<!-- Modal Component -->
+@if (showCreateModal) {
+  <app-event-create (close)="closeCreateModal()"></app-event-create>
+}

@@ -8,8 +8,8 @@
       <h1>Create Account</h1>
 
       <!-- Messages -->
-      <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
-      <div *ngIf="successMessage && isRightPanelActive" class="success-message">{{ successMessage }}</div>
+      @if(errorMessage){<div class="error-message">{{ errorMessage }}</div>}
+      @if(successMessage && isRightPanelActive){<div class="success-message">{{ successMessage }}</div>}
 
       <input type="text" placeholder="Name" [(ngModel)]="signUpName" name="signUpName" required />
       <input type="email" placeholder="Email" [(ngModel)]="signUpEmail" name="signUpEmail" required />
@@ -30,8 +30,8 @@
       <h1>Sign in</h1>
 
       <!-- Messages -->
-      <div *ngIf="signInErrorMessage" class="error-message">{{ signInErrorMessage }}</div>
-      <div *ngIf="successMessage && !isRightPanelActive" class="success-message">{{ successMessage }}</div>
+      @if(signInErrorMessage){<div class="error-message">{{ signInErrorMessage }}</div>}
+      @if(successMessage && !isRightPanelActive){<div class="success-message">{{ successMessage }}</div>}
 
       <input type="email" placeholder="Email" [(ngModel)]="signInEmail" name="signInEmail" required />
       <input type="password" placeholder="Password" [(ngModel)]="signInPassword" name="signInPassword" required />

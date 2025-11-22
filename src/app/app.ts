@@ -1,10 +1,12 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
-  template: '<app-auth></app-auth>', 
-  styleUrls: ['./app.css'],
-   standalone: false
-  
+  imports: [RouterOutlet],
+  template:"<router-outlet />",
+  styleUrl: './app.css'
 })
-export class App {}
+export class App {
+  protected readonly title = signal('eventPlanner-frontend');
+}

@@ -1,14 +1,16 @@
 import { Component } from '@angular/core';
-import { AuthService } from '../../services/auth';
+import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../services/auth/auth';
 
 @Component({
   selector: 'app-auth',
+  imports: [FormsModule],
   templateUrl: './auth.html',
-  styleUrls: ['./auth.css'],
-  standalone: false,
+  styleUrls: ['./auth.css']
 })
 export class Auth {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService, private router: Router) {}
 
   isRightPanelActive = false;
 
@@ -51,7 +53,12 @@ export class Auth {
         console.log('Register response:', res);
         this.successMessage = res.message || 'Registration successful!';
         this.errorMessage = '';
-        this.signUpName = this.signUpEmail = this.signUpPassword = this.signUpRole = '';
+        
+        // Reset fields
+        this.signUpName = '';
+        this.signUpEmail = '';
+        this.signUpPassword = '';
+        this.signUpRole = '';
       },
       error: (err) => {
         console.error('Register error:', err);
@@ -79,7 +86,11 @@ export class Auth {
         this.authService.saveToken(res.token);
         this.successMessage = res.message || `Welcome back, ${res.user?.name || 'User'}!`;
         this.signInErrorMessage = '';
-        this.signInEmail = this.signInPassword = '';
+
+        this.signInEmail = '';
+        this.signInPassword = '';
+
+        this.router.navigate(['event-list']);
       },
       error: (err) => {
         console.error('Login error:', err);

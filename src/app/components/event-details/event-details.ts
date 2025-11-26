@@ -1,30 +1,10 @@
-/* event details */
-
-
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-
-interface Attendee {
-  id: string;
-  email: string;
-  name: string;
-  status: 'going' | 'pending';
-}
-
-interface Event {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  location: string;
-  description: string;
-  organizer: { id: string; name: string; email: string };
-  attendees: Attendee[];
-  userRole: 'organizer' | 'attendee';
-  userRSVP?: 'going' | 'notgoing';
-}
+import { EventDTO, Attendee, UpdateStatusDto, InviteUsersDto } from '../../models/event.models';
+import { AuthService } from '../../services/auth/auth';
+import { EventService } from '../../services/event/event.service';
 
 @Component({
   selector: 'app-event-details',
@@ -34,148 +14,244 @@ interface Event {
   styleUrl: './event-details.css',
 })
 export class EventDetails implements OnInit {
-  event: Event | null = null;
+  event: EventDTO | null = null;
   isLoading = true;
-  showDeleteConfirm = false;
+  isOrganizer = false;
+  currentUserStatus: string = 'Pending';
+
+  // Invite modal
   showInviteModal = false;
-  inviteEmail = '';
+  inviteEmails: string = '';
   inviteError = '';
-  successMessage = '';
 
-  goingCount = 0;
-  pendingCount = 0;
-  notGoingCount = 0;
+  // Attendees modal
+  showAttendeesModal = false;
+  attendeesList: Attendee[] = [];
+  loadingAttendees = false;
 
-  constructor(private route: ActivatedRoute, private router: Router) {}
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private eventService: EventService,
+    private authService: AuthService
+  ) {}
 
   ngOnInit() {
-    this.route.params.subscribe(params => {
-      const eventId = params['id'];
-      this.loadEvent(eventId);
+    const eventId = this.route.snapshot.paramMap.get('id');
+    if (eventId) {
+      this.loadEventDetails(eventId);
+    } else {
+      this.router.navigate(['/events']);
+    }
+  }
+
+  loadEventDetails(eventId: string) {
+    this.isLoading = true;
+    this.eventService.getEventById(eventId).subscribe({
+      next: (response) => {
+        if (response.event) {
+          this.event = response.event;
+          this.checkUserRole();
+        }
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading event details:', error);
+        this.isLoading = false;
+        if (error.status === 403) {
+          alert('You do not have access to this event');
+          this.router.navigate(['/events']);
+        } else if (error.status === 401) {
+          this.authService.logout();
+          this.router.navigate(['/auth']);
+        } else {
+          alert('Failed to load event details');
+          this.router.navigate(['/events']);
+        }
+      },
     });
   }
 
-  loadEvent(eventId: string) {
-    // Mock data - replace with actual API call
-    this.event = {
-      id: eventId,
-      title: 'Team Building Workshop',
-      date: '2025-11-15',
-      time: '14:00',
-      location: 'Conference Room A, Main Office',
-      description: 'Join us for an exciting team building workshop where we will engage in collaborative activities, problem-solving exercises, and networking opportunities. This event is designed to strengthen team bonds and improve communication skills.',
-      organizer: { id: 'org1', name: 'Sarah Wilson', email: 'sarah@example.com' },
-      attendees: [
-        { id: '1', email: 'john@example.com', name: 'John Doe', status: 'going' },
-        { id: '3', email: 'bob@example.com', name: 'Bob Johnson', status: 'pending' },
-        { id: '4', email: 'alice@example.com', name: 'Alice Brown', status: 'going' }
-      ],
-      userRole: 'organizer',
-      userRSVP: undefined,
-    };
+  checkUserRole() {
+    if (!this.event) return;
 
-    const attendees = this.event.attendees || [];
-    this.goingCount = attendees.filter(a => a.status === 'going').length;
-    this.pendingCount = attendees.filter(a => a.status === 'pending').length;
+    // Get current user from token or from attendees list
+    const currentUserAttendee = this.event.attendees.find((att) => att.role === 'organizer');
 
-    this.isLoading = false;
+    if (currentUserAttendee) {
+      this.isOrganizer = currentUserAttendee.role === 'organizer';
+      this.currentUserStatus = currentUserAttendee.status;
+    }
   }
 
-  getStatusBadgeClass(status: string): string {
-    const classes: { [key: string]: string } = {
-      'going': 'badge-going',
-      'pending': 'badge-pending',
-    };
-    return classes[status] || '';
+  // Update RSVP status (for attendees only)
+  updateRSVP(status: 'Going' | 'Maybe' | 'Not Going') {
+    if (!this.event || this.isOrganizer) return;
+
+    const statusData: UpdateStatusDto = { status };
+
+    this.eventService.updateAttendanceStatus(this.event._id, statusData).subscribe({
+      next: (response) => {
+        console.log('RSVP updated successfully');
+        if (response.event) {
+          this.event = response.event;
+          this.checkUserRole();
+        }
+      },
+      error: (error) => {
+        console.error('Error updating RSVP:', error);
+        alert(error.error?.message || 'Failed to update RSVP');
+      },
+    });
   }
 
-  getStatusLabel(status: string): string {
-    const labels: { [key: string]: string } = {
-      'going': 'Going',
-      'pending': 'Pending',
-    };
-    return labels[status] || status;
-  }
-
-  goBack() {
-    this.router.navigate(['/event-list']);
-  }
-
-  editEvent() {
-    console.log('Edit event:', this.event?.id);
-  }
-
-  deleteEvent() {
-    this.showDeleteConfirm = true;
-  }
-
-  confirmDelete() {
-    console.log('Deleting event:', this.event?.id);
-    this.showDeleteConfirm = false;
-    this.router.navigate(['/event-list']);
-  }
-
-  cancelDelete() {
-    this.showDeleteConfirm = false;
-  }
-
+  // Open invite modal (organizer only)
   openInviteModal() {
+    if (!this.isOrganizer) return;
     this.showInviteModal = true;
-    this.inviteEmail = '';
+    this.inviteEmails = '';
     this.inviteError = '';
   }
 
   closeInviteModal() {
     this.showInviteModal = false;
-    this.inviteEmail = '';
+    this.inviteEmails = '';
     this.inviteError = '';
   }
 
-  sendInvite() {
-    const email = this.inviteEmail.trim();
+  // Invite users to event
+  inviteUsers() {
+    if (!this.event) return;
+
     this.inviteError = '';
 
-    if (!email) {
-      this.inviteError = 'Please enter an email address';
+    // Parse emails (split by comma, semicolon, or newline)
+    const emailArray = this.inviteEmails
+      .split(/[,;\n]/)
+      .map((email) => email.trim())
+      .filter((email) => email.length > 0);
+
+    if (emailArray.length === 0) {
+      this.inviteError = 'Please enter at least one email address';
       return;
     }
 
-    if (!this.validateEmail(email)) {
-      this.inviteError = 'Please enter a valid email address';
-      return;
-    }
-
-    if (this.event?.attendees.some(a => a.email === email)) {
-      this.inviteError = 'This person is already invited';
-      return;
-    }
-
-    console.log('Inviting:', email);
-    this.successMessage = `Invitation sent to ${email}!`;
-    this.inviteEmail = '';
-
-    setTimeout(() => {
-      this.closeInviteModal();
-      this.successMessage = '';
-    }, 1500);
-  }
-
-  validateEmail(email: string): boolean {
+    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const invalidEmails = emailArray.filter((email) => !emailRegex.test(email));
+
+    if (invalidEmails.length > 0) {
+      this.inviteError = `Invalid email(s): ${invalidEmails.join(', ')}`;
+      return;
+    }
+
+    const inviteData: InviteUsersDto = { emails: emailArray };
+
+    this.eventService.inviteUsers(this.event._id, inviteData).subscribe({
+      next: (response) => {
+        console.log('Users invited successfully:', response);
+        if (response.event) {
+          this.event = response.event;
+        }
+        alert(`Successfully invited ${response.invitedEmails?.length || 0} user(s)`);
+        this.closeInviteModal();
+      },
+      error: (error) => {
+        console.error('Error inviting users:', error);
+        this.inviteError = error.error?.message || 'Failed to invite users. Please try again.';
+      },
+    });
   }
 
-  updateRSVP(status: 'going' | 'notgoing') {
-    console.log('Updating RSVP to:', status);
-    if (this.event) {
-      this.event.userRSVP = status;
+  // Open attendees modal (organizer only)
+  openAttendeesModal() {
+    if (!this.event || !this.isOrganizer) return;
+
+    this.showAttendeesModal = true;
+    this.loadAttendees();
+  }
+
+  closeAttendeesModal() {
+    this.showAttendeesModal = false;
+    this.attendeesList = [];
+  }
+
+  loadAttendees() {
+    if (!this.event) return;
+
+    this.loadingAttendees = true;
+    this.eventService.getEventAttendees(this.event._id).subscribe({
+      next: (response) => {
+        if (response.attendees) {
+          this.attendeesList = response.attendees;
+        }
+        this.loadingAttendees = false;
+      },
+      error: (error) => {
+        console.error('Error loading attendees:', error);
+        this.loadingAttendees = false;
+        alert('Failed to load attendees list');
+      },
+    });
+  }
+
+  // Get badge class for status
+  getStatusBadgeClass(status: string): string {
+    const classes: { [key: string]: string } = {
+      Going: 'badge-going',
+      Maybe: 'badge-maybe',
+      'Not Going': 'badge-notgoing',
+      Pending: 'badge-pending',
+    };
+    return classes[status] || 'badge-pending';
+  }
+
+  // Navigate back to events list
+  goBack() {
+    this.router.navigate(['/events']);
+  }
+
+  // Edit event (organizer only)
+  editEvent() {
+    if (!this.event || !this.isOrganizer) return;
+    this.router.navigate(['/events', this.event._id, 'edit']);
+  }
+
+  // Delete event (organizer only)
+  deleteEvent() {
+    if (!this.event || !this.isOrganizer) return;
+
+    if (confirm('Are you sure you want to delete this event?')) {
+      this.eventService.deleteEvent(this.event._id).subscribe({
+        next: () => {
+          alert('Event deleted successfully');
+          this.router.navigate(['/events']);
+        },
+        error: (error) => {
+          console.error('Error deleting event:', error);
+          alert('Failed to delete event');
+        },
+      });
     }
   }
 
-  removeAttendee(attendeeId: string) {
-    console.log('Removing attendee:', attendeeId);
-    if (this.event) {
-      this.event.attendees = this.event.attendees.filter(a => a.id !== attendeeId);
-    }
+  // Format date for display
+  formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
+
+  // Check if date is in the past
+  isPastEvent(): boolean {
+    if (!this.event) return false;
+    const eventDate = new Date(this.event.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate < today;
   }
 }

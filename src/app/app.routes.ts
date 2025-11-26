@@ -6,7 +6,7 @@ import { EventDetails } from './components/event-details/event-details';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'auth', pathMatch: 'full' },
-  { path: 'auth', component: Auth, /*canActivate: [NoAuthGuard]*/ },
-  { path: 'event-details/:id', component: EventDetails, /*canActivate: [AuthGuard]*/ },
-  { path: 'event-list', component: EventList, /*canActivate: [AuthGuard]*/ } // temp disaable auth guard for ui testing
+  { path: 'auth', component: Auth, canActivate: [NoAuthGuard] },
+  { path: 'event-details/:id', component: EventDetails, canActivate: [AuthGuard] },
+  { path: 'event-list', component: EventList, canActivate: [AuthGuard] },
 ];

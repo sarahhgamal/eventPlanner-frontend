@@ -2,9 +2,12 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { EventEdit } from '../event-edit/event-edit'; 
+import { EventEdit } from '../event-edit/event-edit';
+import { EventService } from '../../services/event/event.service';
+import { AuthService } from '../../services/auth/auth';
+import { CreateEventDto, EventDTO } from '../../models/event.models';
 
-interface Event {
+interface EventViewModel {
   id: string;
   title: string;
   date: string;
@@ -20,26 +23,26 @@ interface Event {
 @Component({
   selector: 'app-event-list',
   standalone: true,
-  imports: [CommonModule, FormsModule , EventEdit],
+  imports: [CommonModule, FormsModule, EventEdit],
   templateUrl: './event-list.html',
   styleUrl: './event-list.css',
 })
 export class EventList implements OnInit {
-  events: Event[] = [];
-  filteredEvents: Event[] = [];
+  events: EventViewModel[] = [];
+  filteredEvents: EventViewModel[] = [];
   isLoading = true;
   sidebarExpanded = false;
-  
+
   // Search and filter
   searchQuery = '';
   filterRSVP: 'all' | 'going' | 'maybe' | 'notgoing' = 'all';
-  
+
   // Modals
   showCreateModal = false;
   showEditModal = false;
   showDeleteConfirm = false;
-  selectedEvent: Event | null = null;
-  
+  selectedEvent: EventViewModel | null = null;
+
   // Create event form
   newEventTitle = '';
   newEventDate = '';
@@ -48,68 +51,78 @@ export class EventList implements OnInit {
   newEventDescription = '';
   createError = '';
   dateError = '';
-  
-  constructor(private router: Router) {}
+
+  // Current user ID for role determination
+  private currentUserId: string = '';
+
+  constructor(
+    private router: Router,
+    private eventService: EventService,
+    private authService: AuthService
+  ) {}
 
   ngOnInit() {
     this.loadEvents();
   }
 
   loadEvents() {
-    // Mock data - replace with actual API call
-    this.events = [
-      {
-        id: '1',
-        title: 'Team Building Workshop',
-        date: '2025-11-15',
-        time: '14:00',
-        location: 'Conference Room A',
-        description: 'Team building activities and networking',
-        organizer: { id: 'org1', name: 'Sarah Wilson', email: 'sarah@example.com' },
-        attendees: [],
-        userRole: 'organizer',
-        userRSVP: undefined
+    this.isLoading = true;
+    this.eventService.getAllMyEvents().subscribe({
+      next: (response) => {
+        if (response.events) {
+          this.events = this.transformEvents(response.events);
+          this.filteredEvents = [...this.events];
+        }
+        this.isLoading = false;
       },
-      {
-        id: '2',
-        title: 'Project Kickoff Meeting',
-        date: '2025-12-01',
-        time: '10:00',
-        location: 'Main Office, Room 302',
-        description: 'Initial meeting for the new project',
-        organizer: { id: 'org2', name: 'John Smith', email: 'john@example.com' },
-        attendees: [],
-        userRole: 'attendee',
-        userRSVP: 'going'
+      error: (error) => {
+        console.error('Error loading events:', error);
+        this.isLoading = false;
+        if (error.status === 401) {
+          // Token expired or invalid
+          this.authService.logout();
+          this.router.navigate(['/auth']);
+        }
       },
-      {
-        id: '3',
-        title: 'Annual Company Dinner',
-        date: '2025-12-20',
-        time: '18:00',
-        location: 'Grand Hotel Ballroom',
-        description: 'Year-end celebration dinner',
-        organizer: { id: 'org3', name: 'Emily Davis', email: 'emily@example.com' },
-        attendees: [],
-        userRole: 'attendee',
-        userRSVP: 'maybe'
-      },
-      {
-        id: '4',
-        title: 'Training Session',
-        date: '2025-11-28',
-        time: '09:00',
-        location: 'Training Center',
-        description: 'Professional development training',
-        organizer: { id: 'org4', name: 'Mike Johnson', email: 'mike@example.com' },
-        attendees: [],
-        userRole: 'attendee',
-        userRSVP: 'notgoing'
+    });
+  }
+
+  // Transform API events to ViewModel format
+  private transformEvents(apiEvents: EventDTO[]): EventViewModel[] {
+    return apiEvents.map((event) => {
+      const currentUserAttendee = event.attendees.find(
+        (att) => att.user._id === this.currentUserId || att.user.id === this.currentUserId
+      );
+
+      const userRole = currentUserAttendee?.role || 'attendee';
+      let userRSVP: 'going' | 'maybe' | 'notgoing' | undefined;
+
+      if (currentUserAttendee && currentUserAttendee.status) {
+        const statusMap: { [key: string]: 'going' | 'maybe' | 'notgoing' } = {
+          Going: 'going',
+          Maybe: 'maybe',
+          'Not Going': 'notgoing',
+        };
+        userRSVP = statusMap[currentUserAttendee.status];
       }
-    ];
-    
-    this.filteredEvents = [...this.events];
-    this.isLoading = false;
+
+      return {
+        id: event._id,
+        title: event.title,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        description: event.description || '',
+        organizer: {
+          id: event.organizer._id || event.organizer.id || '',
+          name: event.organizer.name,
+          email: event.organizer.email,
+        },
+        attendees: event.attendees,
+        userRole,
+        userRSVP,
+      };
+    });
   }
 
   toggleSidebar() {
@@ -122,24 +135,25 @@ export class EventList implements OnInit {
 
   applyFilters() {
     let filtered = [...this.events];
-    
+
     // Search filter
     if (this.searchQuery.trim()) {
       const query = this.searchQuery.toLowerCase();
-      filtered = filtered.filter(event => 
-        event.title.toLowerCase().includes(query) ||
-        event.description.toLowerCase().includes(query) ||
-        event.location.toLowerCase().includes(query) ||
-        event.date.includes(query) ||
-        event.userRole.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (event) =>
+          event.title.toLowerCase().includes(query) ||
+          event.description.toLowerCase().includes(query) ||
+          event.location.toLowerCase().includes(query) ||
+          event.date.includes(query) ||
+          event.userRole.toLowerCase().includes(query)
       );
     }
-    
+
     // RSVP filter
     if (this.filterRSVP !== 'all') {
-      filtered = filtered.filter(event => event.userRSVP === this.filterRSVP);
+      filtered = filtered.filter((event) => event.userRSVP === this.filterRSVP);
     }
-    
+
     this.filteredEvents = filtered;
   }
 
@@ -154,20 +168,20 @@ export class EventList implements OnInit {
   getRSVPBadgeClass(rsvp: string | undefined): string {
     if (!rsvp) return 'badge-organizer';
     const classes: { [key: string]: string } = {
-      'going': 'badge-going',
-      'maybe': 'badge-maybe',
-      'notgoing': 'badge-notgoing',
+      going: 'badge-going',
+      maybe: 'badge-maybe',
+      notgoing: 'badge-notgoing',
     };
     return classes[rsvp] || '';
   }
 
-  getRSVPLabel(event: Event): string {
+  getRSVPLabel(event: EventViewModel): string {
     if (event.userRole === 'organizer') return 'Organizer';
     if (!event.userRSVP) return 'No Response';
     const labels: { [key: string]: string } = {
-      'going': 'Going',
-      'maybe': 'Maybe',
-      'notgoing': 'Not Going',
+      going: 'Going',
+      maybe: 'Maybe',
+      notgoing: 'Not Going',
     };
     return labels[event.userRSVP] || 'Unknown';
   }
@@ -196,8 +210,13 @@ export class EventList implements OnInit {
     this.createError = '';
     this.dateError = '';
 
-    if (!this.newEventTitle || !this.newEventDate || !this.newEventTime || 
-        !this.newEventLocation || !this.newEventDescription) {
+    if (
+      !this.newEventTitle ||
+      !this.newEventDate ||
+      !this.newEventTime ||
+      !this.newEventLocation ||
+      !this.newEventDescription
+    ) {
       this.createError = 'Please fill in all required fields';
       return;
     }
@@ -211,26 +230,28 @@ export class EventList implements OnInit {
       return;
     }
 
-    const newEvent: Event = {
-      id: Date.now().toString(),
+    const newEventData: CreateEventDto = {
       title: this.newEventTitle,
       date: this.newEventDate,
       time: this.newEventTime,
       location: this.newEventLocation,
       description: this.newEventDescription,
-      organizer: { id: 'current', name: 'Current User', email: 'user@example.com' },
-      attendees: [],
-      userRole: 'organizer',
-      userRSVP: undefined
     };
 
-    console.log('Creating event:', newEvent);
-    this.events.unshift(newEvent);
-    this.applyFilters();
-    this.closeCreateModal();
+    this.eventService.createEvent(newEventData).subscribe({
+      next: (response) => {
+        console.log('Event created successfully:', response);
+        this.loadEvents(); // Reload events
+        this.closeCreateModal();
+      },
+      error: (error) => {
+        console.error('Error creating event:', error);
+        this.createError = error.error?.message || 'Failed to create event. Please try again.';
+      },
+    });
   }
 
-  openEditModal(event: Event) {
+  openEditModal(event: EventViewModel) {
     this.selectedEvent = event;
     this.showEditModal = true;
   }
@@ -242,16 +263,21 @@ export class EventList implements OnInit {
 
   saveEditedEvent(eventData: any) {
     if (this.selectedEvent) {
-      const index = this.events.findIndex(e => e.id === this.selectedEvent!.id);
-      if (index !== -1) {
-        this.events[index] = { ...this.events[index], ...eventData };
-        this.applyFilters();
-      }
+      this.eventService.updateEvent(this.selectedEvent.id, eventData).subscribe({
+        next: (response) => {
+          console.log('Event updated successfully:', response);
+          this.loadEvents(); // Reload events
+          this.closeEditModal();
+        },
+        error: (error) => {
+          console.error('Error updating event:', error);
+          alert('Failed to update event. Please try again.');
+        },
+      });
     }
-    this.closeEditModal();
   }
 
-  openDeleteConfirm(event: Event) {
+  openDeleteConfirm(event: EventViewModel) {
     this.selectedEvent = event;
     this.showDeleteConfirm = true;
   }
@@ -263,15 +289,23 @@ export class EventList implements OnInit {
 
   confirmDelete() {
     if (this.selectedEvent) {
-      console.log('Deleting event:', this.selectedEvent.id);
-      this.events = this.events.filter(e => e.id !== this.selectedEvent!.id);
-      this.applyFilters();
+      this.eventService.deleteEvent(this.selectedEvent.id).subscribe({
+        next: (response) => {
+          console.log('Event deleted successfully:', response);
+          this.loadEvents(); // Reload events
+          this.closeDeleteConfirm();
+        },
+        error: (error) => {
+          console.error('Error deleting event:', error);
+          alert('Failed to delete event. Please try again.');
+          this.closeDeleteConfirm();
+        },
+      });
     }
-    this.closeDeleteConfirm();
   }
 
   logout() {
-    console.log('Logging out...');
+    this.authService.logout();
     this.router.navigate(['/auth']);
   }
 }

@@ -7,12 +7,17 @@
     <!-- Back Button -->
     <button class="back-link" (click)="goBack()">← Back to Events</button>
 
+    <!-- Success Message -->
+    @if (successMessage) {
+      <div class="success-alert">{{ successMessage }}</div>
+    }
+
     <!-- Event Card -->
     <div class="event-card">
       <div class="event-title-section">
         <div class="title-and-actions">
             <h1>{{ event.title }}</h1>
-            @if (isOrganizer) {
+            @if (event.userRole === 'organizer') {
                 <div class="organizer-actions">
                     <button class="btn btn-danger" (click)="deleteEvent()">Delete</button>
                     <button class="btn btn-primary" (click)="editEvent()">Edit</button>
@@ -30,7 +35,7 @@
         <div class="info-item">
           <span class="info-label row-info-label">📅 Date & Time</span>
           <br/>
-          <span class="info-value">{{ formatDate(event.date) }} at {{ event.time }}</span>
+          <span class="info-value">{{ event.date }} at {{ event.time }}</span>
         </div>
         <div class="info-item">
           <span class="info-label row-info-label">📍 Location</span>
@@ -45,8 +50,8 @@
       </div>
     </div>
 
-    <!-- Organizer View -->
-    @if (isOrganizer) {
+    @if (event.userRole === 'organizer') {
+      <!-- Attendees List -->
       <div class="attendees-card">
         <div class="card-header">
           <h3>Attendees ({{ event.attendees.length }})</h3>
@@ -57,22 +62,40 @@
           @if (event.attendees.length === 0) {
             <p class="no-attendees">No attendees yet. Invite people to your event!</p>
           } @else {
-            @for (let attendee of event.attendees; track attendee.user._id) {
+            @for (attendee of event.attendees; track attendee.id) {
               <div class="attendee-item">
                 <div class="attendee-info">
-                  <div class="attendee-name">{{ attendee.user.name }}</div>
-                  <div class="attendee-email">{{ attendee.user.email }}</div>
+                  <div class="attendee-name">{{ attendee.name }}</div>
+                  <div class="attendee-email">{{ attendee.email }}</div>
                 </div>
+
                 <div class="attendee-actions">
                   <span class="badge" [ngClass]="getStatusBadgeClass(attendee.status)">
-                    {{ attendee.status }}
+                    {{ getStatusLabel(attendee.status) }}
                   </span>
+                  <button class="btn-remove" (click)="removeAttendee(attendee.id)" title="Remove attendee">
+                    ✕
+                  </button>
                 </div>
               </div>
             }
           }
         </div>
       </div>
+
+      <!-- Delete Confirmation Modal -->
+      @if (showDeleteConfirm) {
+        <div class="modal-overlay" (click)="cancelDelete()">
+          <div class="confirm-modal" (click)="$event.stopPropagation()">
+            <h2>Delete Event?</h2>
+            <p>Are you sure you want to delete <strong>{{ event.title }}</strong>? This action cannot be undone.</p>
+            <div class="modal-actions">
+              <button class="btn btn-secondary" (click)="cancelDelete()">Cancel</button>
+              <button class="btn btn-danger" (click)="confirmDelete()">Delete</button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Invite Modal -->
       @if (showInviteModal) {
@@ -86,20 +109,22 @@
             <div class="modal-body">
               @if (inviteError) {
                 <div class="error-alert">{{ inviteError }}</div>
-              </div>
+              }
+
               <div class="form-group">
-                <label class="form-label">Email Addresses <span class="required">*</span></label>
-                <textarea
+                <label class="form-label">Email Address <span class="required">*</span></label>
+                <input
+                  type="email"
                   class="form-input"
-                  [(ngModel)]="inviteEmails"
-                  placeholder="Enter email addresses separated by comma, semicolon, or newline"
-                ></textarea>
+                  [(ngModel)]="inviteEmail"
+                  placeholder="Enter email address" 
+                >
               </div>
             </div>
 
             <div class="modal-footer">
               <button class="btn btn-secondary" (click)="closeInviteModal()">Cancel</button>
-              <button class="btn btn-primary" (click)="inviteUsers()">Send Invite</button>
+              <button class="btn btn-primary" (click)="sendInvite()">Send Invite</button>
             </div>
           </div>
         </div>
@@ -107,52 +132,53 @@
     }
 
     <!-- Attendee View -->
-    @if (!isOrganizer) {
+    @if (event.userRole === 'attendee') {
+      <!-- RSVP Section -->
       <div class="rsvp-card">
         <h3>Your Response</h3>
         <div class="rsvp-buttons">
           <button
             class="rsvp-btn"
-            [class.active]="currentUserStatus === 'Going'"
-            (click)="updateRSVP('Going')"
+            [class.active]="event.userRSVP === 'going'"
+            (click)="updateRSVP('going')"
           >
             ✓ Going
           </button>
           <button
             class="rsvp-btn"
-            [class.active]="currentUserStatus === 'Not Going'"
-            (click)="updateRSVP('Not Going')"
+            [class.active]="event.userRSVP === 'notgoing'"
+            (click)="updateRSVP('notgoing')"
           >
             ✕ Not Going
           </button>
         </div>
-        @if (!currentUserStatus || currentUserStatus === 'Pending') {
+        @if (!event.userRSVP) {
           <p class="no-response">You haven't responded yet</p>
         } @else {
-          <p class="response-status">You responded: <strong>{{ currentUserStatus }}</strong></p>
+          <p class="response-status">You responded: <strong>{{ getStatusLabel(event.userRSVP) }}</strong></p>
         }
+      </div>
+
+      <!-- Attendees Summary -->
+      <div class="attendees-summary">
+        <h3>Attendees ({{ event.attendees.length }})</h3>
+        <div class="summary-stats">
+            <div class="stat">
+                <span class="stat-value">{{ goingCount }}</span>
+                <span class="stat-label">Going</span>
+            </div>
+
+            <div class="stat">
+                <span class="stat-value">{{ pendingCount }}</span>
+                <span class="stat-label">Pending</span>
+            </div>
+
+            <div class="stat">
+                <span class="stat-value">{{ notGoingCount }}</span>
+                <span class="stat-label">Not Going</span>
+            </div>
+            </div>
       </div>
     }
   }
 </div>
-<!-- Attendees Summary (Organizer View) -->
-@if (isOrganizer) {
-  <div class="attendees-summary">
-    <div class="summary-item">
-      <span class="summary-label">✅ Going</span>
-      <span class="summary-value">{{ event.attendees.filter(a => a.status === 'Going').length }}</span>
-    </div>
-    <div class="summary-item">
-      <span class="summary-label">❓ Maybe</span>
-      <span class="summary-value">{{ event.attendees.filter(a => a.status === 'Maybe').length }}</span>
-    </div>
-    <div class="summary-item">
-      <span class="summary-label">❌ Not Going</span>
-      <span class="summary-value">{{ event.attendees.filter(a => a.status === 'Not Going').length }}</span>
-    </div>
-    <div class="summary-item">
-      <span class="summary-label">⏳ Pending</span>
-      <span class="summary-value">{{ event.attendees.filter(a => a.status === 'Pending').length }}</span>
-    </div>
-  </div>
-}

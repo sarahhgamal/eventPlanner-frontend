@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { EventEdit } from '../event-edit/event-edit';
 import { EventService } from '../../services/event/event.service';
 import { AuthService } from '../../services/auth/auth';
-import { CreateEventDto, EventDTO } from '../../models/event.models';
+import { CreateEventDto, EventDTO, UpdateStatusDto } from '../../models/event.models';
+import { EventCreate } from '../event-create/event-create';
 
 interface EventViewModel {
   id: string;
@@ -17,30 +18,32 @@ interface EventViewModel {
   organizer: { id: string; name: string; email: string };
   attendees: any[];
   userRole: 'organizer' | 'attendee';
-  userRSVP?: 'going' | 'maybe' | 'notgoing';
+  userRSVP?: 'going' | 'maybe' | 'notgoing' | 'pending';
 }
 
 @Component({
   selector: 'app-event-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, EventEdit],
+  imports: [CommonModule, FormsModule, EventEdit, EventCreate],
   templateUrl: './event-list.html',
   styleUrl: './event-list.css',
 })
 export class EventList implements OnInit {
   events: EventViewModel[] = [];
   filteredEvents: EventViewModel[] = [];
-  isLoading = true;
+  isLoading = signal<boolean>(true)
   sidebarExpanded = false;
+  activeTab: 'all' | 'organized' | 'invited' = 'all';
 
   // Search and filter
   searchQuery = '';
-  filterRSVP: 'all' | 'going' | 'maybe' | 'notgoing' = 'all';
-
+  filterRSVP: 'all' | 'going' | 'maybe' | 'notgoing' | 'pending' = 'all';
+  
   // Modals
   showCreateModal = false;
   showEditModal = false;
   showDeleteConfirm = false;
+  showChangeStatusModal = false;
   selectedEvent: EventViewModel | null = null;
 
   // Create event form
@@ -51,6 +54,9 @@ export class EventList implements OnInit {
   newEventDescription = '';
   createError = '';
   dateError = '';
+
+  // Change status
+  pendingStatus: 'pending' |'going' | 'maybe' | 'notgoing' = 'going';
 
   // Current user ID for role determination
   private currentUserId: string = '';
@@ -65,21 +71,41 @@ export class EventList implements OnInit {
     this.loadEvents();
   }
 
+  switchTab(tab: 'all' | 'organized' | 'invited') {
+    this.activeTab = tab;
+    this.filterRSVP = 'all';
+    this.loadEvents();
+  }
+
   loadEvents() {
-    this.isLoading = true;
-    this.eventService.getAllMyEvents().subscribe({
+    this.isLoading.set(true);
+
+    let observable;
+    switch (this.activeTab) {
+      case 'organized':
+        observable = this.eventService.getMyOrganizedEvents();
+        break;
+      case 'invited':
+        observable = this.eventService.getMyInvitedEvents();
+        break;
+      default:
+        observable = this.eventService.getAllMyEvents();
+    }
+
+    observable.subscribe({
       next: (response) => {
         if (response.events) {
           this.events = this.transformEvents(response.events);
-          this.filteredEvents = [...this.events];
         }
-        this.isLoading = false;
+        this.applyFilters();
+        this.isLoading.set(false);
       },
       error: (error) => {
         console.error('Error loading events:', error);
-        this.isLoading = false;
+        this.isLoading.set(false);
+        this.events = [];
+        this.filteredEvents = [];
         if (error.status === 401) {
-          // Token expired or invalid
           this.authService.logout();
           this.router.navigate(['/auth']);
         }
@@ -90,11 +116,15 @@ export class EventList implements OnInit {
   // Transform API events to ViewModel format
   private transformEvents(apiEvents: EventDTO[]): EventViewModel[] {
     return apiEvents.map((event) => {
-      const currentUserAttendee = event.attendees.find(
-        (att) => att.user._id === this.currentUserId || att.user.id === this.currentUserId
-      );
+      this.currentUserId = this.authService.getCurrentUserId();
+      const isOrganizer = event.organizer._id === this.currentUserId;
+      console.log('Organizer _id:', event.organizer._id);
+      console.log('Organizer id:', event.organizer.id);
+      console.log('Current User ID:', this.currentUserId);
 
-      const userRole = currentUserAttendee?.role || 'attendee';
+      const currentUserAttendee = event.attendees.find((att) => att.user._id === this.currentUserId);
+
+      const userRole = isOrganizer ? 'organizer' : (currentUserAttendee?.role || 'attendee');
       let userRSVP: 'going' | 'maybe' | 'notgoing' | undefined;
 
       if (currentUserAttendee && currentUserAttendee.status) {
@@ -105,11 +135,12 @@ export class EventList implements OnInit {
         };
         userRSVP = statusMap[currentUserAttendee.status];
       }
+      console.log("event: " + event + ", role: " + userRole);
 
       return {
         id: event._id,
         title: event.title,
-        date: event.date,
+        date: this.formatDate(event.date),
         time: event.time,
         location: event.location,
         description: event.description || '',
@@ -123,6 +154,16 @@ export class EventList implements OnInit {
         userRSVP,
       };
     });
+  }
+
+  private formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    const options: Intl.DateTimeFormatOptions = { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    };
+    return date.toLocaleDateString('en-US', options);
   }
 
   toggleSidebar() {
@@ -149,9 +190,14 @@ export class EventList implements OnInit {
       );
     }
 
-    // RSVP filter
-    if (this.filterRSVP !== 'all') {
-      filtered = filtered.filter((event) => event.userRSVP === this.filterRSVP);
+    // RSVP filter 
+    if (this.activeTab === 'invited' && this.filterRSVP !== 'all') {
+      if (this.filterRSVP === 'pending') {
+        // Filter for events with no response (pending)
+        filtered = filtered.filter(event => !event.userRSVP || event.userRSVP === 'pending');
+      } else {
+        filtered = filtered.filter(event => event.userRSVP === this.filterRSVP);
+      }
     }
 
     this.filteredEvents = filtered;
@@ -167,25 +213,27 @@ export class EventList implements OnInit {
 
   getRSVPBadgeClass(rsvp: string | undefined): string {
     if (!rsvp) return 'badge-organizer';
+    if (rsvp === 'pending') return 'badge-pending';
     const classes: { [key: string]: string } = {
       going: 'badge-going',
       maybe: 'badge-maybe',
       notgoing: 'badge-notgoing',
     };
-    return classes[rsvp] || '';
+    return classes[rsvp] || 'badge-pending';
   }
 
   getRSVPLabel(event: EventViewModel): string {
     if (event.userRole === 'organizer') return 'Organizer';
-    if (!event.userRSVP) return 'No Response';
+    if (!event.userRSVP) return 'Pending';
     const labels: { [key: string]: string } = {
       going: 'Going',
       maybe: 'Maybe',
       notgoing: 'Not Going',
     };
-    return labels[event.userRSVP] || 'Unknown';
+    return labels[event.userRSVP] || 'Pending';
   }
 
+  // Modal Handlers
   openCreateModal() {
     this.showCreateModal = true;
     this.resetCreateForm();
@@ -251,6 +299,17 @@ export class EventList implements OnInit {
     });
   }
 
+  handleChildCreate(eventData: CreateEventDto) {
+  // Set parent form fields from child
+  this.newEventTitle = eventData.title;
+  this.newEventDate = eventData.date;
+  this.newEventTime = eventData.time;
+  this.newEventLocation = eventData.location;
+  this.newEventDescription = eventData.description;
+
+  this.createEvent();
+}
+
   openEditModal(event: EventViewModel) {
     this.selectedEvent = event;
     this.showEditModal = true;
@@ -301,6 +360,48 @@ export class EventList implements OnInit {
           this.closeDeleteConfirm();
         },
       });
+    }
+  }
+
+  openChangeStatusModal(event: EventViewModel) {
+    this.selectedEvent = event;
+    this.pendingStatus = event.userRSVP || 'pending';
+    this.showChangeStatusModal = true;
+  }
+
+  closeChangeStatusModal() {
+    this.showChangeStatusModal = false;
+    this.selectedEvent = null;
+  }
+
+  changeRSVPStatus() {
+    if (this.selectedEvent) {
+
+      const statusMap: { [key: string]: UpdateStatusDto['status'] } = {
+        going: 'Going',
+        maybe: 'Maybe',
+        notgoing: 'Not Going',
+      };
+
+      const apiStatus = statusMap[this.pendingStatus];
+
+      const statusData: UpdateStatusDto = {
+        status: apiStatus
+      };
+
+      this.eventService
+        .updateAttendanceStatus(this.selectedEvent.id, statusData)
+        .subscribe({
+          next: (response) => {
+            console.log('RSVP status updated successfully:', response);
+            this.loadEvents();
+            this.closeChangeStatusModal();
+          },
+          error: (error) => {
+            console.error('Error updating RSVP status:', error);
+            alert('Failed to update RSVP status. Please try again.');
+          },
+        });
     }
   }
 

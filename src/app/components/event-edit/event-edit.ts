@@ -38,13 +38,23 @@ export class EventEdit implements OnInit, OnDestroy {
     // Pre-populate form with existing event data
     if (this.eventData) {
       this.title = this.eventData.title || '';
-      this.date = this.eventData.date || '';
+      this.date = this.formatDateForInput(this.eventData.date) || '';
       this.time = this.eventData.time || '';
       this.location = this.eventData.location || '';
       this.description = this.eventData.description || '';
       this.attendees = this.eventData.attendees ? [...this.eventData.attendees] : [];
     }
   }
+
+    // helper
+    private formatDateForInput(dateString: string): string {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = ('0' + (date.getMonth() + 1)).slice(-2); // zero-padded
+      const day = ('0' + date.getDate()).slice(-2); // zero-padded
+      return `${year}-${month}-${day}`;
+    }
 
   ngOnDestroy() {
     console.log('EditEvent Modal Closed');

@@ -17,12 +17,6 @@
           <span class="label">Events</span>
         }
       </a>
-      <a class="nav-item" (click)="toggleSidebar()">
-        <span class="icon">📊</span>
-        @if(sidebarExpanded) {
-          <span class="label">Dashboard</span>
-        }
-      </a>
       <a class="nav-item logout" (click)="logout()">
         <span class="icon">🚪</span>
         @if(sidebarExpanded) {
@@ -41,31 +35,57 @@
         <button class="btn-create" (click)="openCreateModal()">+ Create Event</button>
       </div>
 
+      <!-- Tabs -->
+      <div class="tabs-container">
+        <button 
+          class="tab-btn" 
+          [class.active]="activeTab === 'all'"
+          (click)="switchTab('all')">
+          All Events
+        </button>
+        <button 
+          class="tab-btn" 
+          [class.active]="activeTab === 'organized'"
+          (click)="switchTab('organized')">
+          My Organized Events
+        </button>
+        <button 
+          class="tab-btn" 
+          [class.active]="activeTab === 'invited'"
+          (click)="switchTab('invited')">
+          My Invited Events
+        </button>
+      </div>
+
       <!-- Search and Filter Bar -->
       <div class="search-filter-bar">
         <div class="search-box">
           <input 
             type="text" 
-            placeholder="Search events by name, date, location, description, or role..." 
+            placeholder="Search events by name, location, or description..." 
             [(ngModel)]="searchQuery"
             (ngModelChange)="onSearchChange()"
             class="search-input"
           />
         </div>
         
-        <div class="filter-box">
-          <select [(ngModel)]="filterRSVP" (ngModelChange)="onFilterChange()" class="filter-select">
-            <option value="all">All Events</option>
-            <option value="going">Going</option>
-            <option value="maybe">Maybe</option>
-            <option value="notgoing">Not Going</option>
-          </select>
-        </div>
+        <!-- Status filter only shown for invited events tab -->
+        @if(activeTab === 'invited') {
+          <div class="filter-box">
+            <select [(ngModel)]="filterRSVP" (ngModelChange)="onFilterChange()" class="filter-select">
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="going">Going</option>
+              <option value="maybe">Maybe</option>
+              <option value="notgoing">Not Going</option>
+            </select>
+          </div>
+        }
       </div>
 
       <!-- Events Table -->
       <div class="events-table-container">
-        @if(isLoading) {
+        @if(isLoading()) {
           <div class="loading">Loading events...</div>
         } @else if(filteredEvents.length === 0) {
           <div class="no-events">
@@ -105,7 +125,7 @@
                       <button class="btn-action btn-edit" (click)="openEditModal(event)">Edit</button>
                       <button class="btn-action btn-delete" (click)="openDeleteConfirm(event)">Delete</button>
                     } @else {
-                      <span class="no-actions">—</span>
+                      <button class="btn-action btn-status" (click)="openChangeStatusModal(event)">Change Status</button>
                     }
                   </td>
                 </tr>
@@ -119,55 +139,10 @@
 
   <!-- Create Event Modal -->
   @if(showCreateModal) {
-    <div class="modal-overlay" (click)="closeCreateModal()">
-      <div class="modal-content" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h2>Create New Event</h2>
-          <button class="close-btn" (click)="closeCreateModal()">&times;</button>
-        </div>
-        
-        <form (ngSubmit)="createEvent()" class="modal-form">
-          @if(createError) {
-            <div class="error-message">{{ createError }}</div>
-          }
-          
-          <div class="form-group">
-            <label>Event Title *</label>
-            <input type="text" [(ngModel)]="newEventTitle" name="title" required />
-          </div>
-          
-          <div class="form-row">
-            <div class="form-group">
-              <label>Date *</label>
-              <input type="date" [(ngModel)]="newEventDate" name="date" required />
-              @if(dateError) {
-                <span class="field-error">{{ dateError }}</span>
-              }
-            </div>
-            
-            <div class="form-group">
-              <label>Time *</label>
-              <input type="time" [(ngModel)]="newEventTime" name="time" required />
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label>Location *</label>
-            <input type="text" [(ngModel)]="newEventLocation" name="location" required />
-          </div>
-          
-          <div class="form-group">
-            <label>Description *</label>
-            <textarea [(ngModel)]="newEventDescription" name="description" rows="4" required></textarea>
-          </div>
-          
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" (click)="closeCreateModal()">Cancel</button>
-            <button type="submit" class="btn-submit">Create Event</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <app-event-create
+      (close)="closeCreateModal()"
+      (submitCreate)="handleChildCreate($event)">
+  </app-event-create>
   }
 
   <!-- Edit Event Modal -->
@@ -183,9 +158,10 @@
   <!-- Delete Confirmation Modal -->
   @if(showDeleteConfirm && selectedEvent) {
     <div class="modal-overlay" (click)="closeDeleteConfirm()">
-      <div class="modal-content delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-content sm-modal" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h2>Confirm Delete</h2>
+          <button class="close-btn" (click)="closeDeleteConfirm()">✕</button>
         </div>
         
         <div class="modal-body">
@@ -193,9 +169,41 @@
           <p class="warning-text">This action cannot be undone.</p>
         </div>
         
-        <div class="modal-actions">
+        <div class="modal-footer">
           <button type="button" class="btn-cancel" (click)="closeDeleteConfirm()">Cancel</button>
           <button type="button" class="btn-delete-confirm" (click)="confirmDelete()">Delete Event</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Change Status Modal -->
+  @if(showChangeStatusModal && selectedEvent) {
+    <div class="modal-overlay" (click)="closeChangeStatusModal()">
+      <div class="modal-content sm-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Update RSVP Status</h2>
+          <button class="close-btn" (click)="closeChangeStatusModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p>Change your RSVP status for <strong>{{ selectedEvent.title }}</strong>:</p>
+          <div class="status-options">
+            <label>
+              <input type="radio" name="rsvp" value="going" [(ngModel)]="pendingStatus" />Going
+            </label>
+            <label>
+              <input type="radio" name="rsvp" value="maybe" [(ngModel)]="pendingStatus" />Maybe
+            </label>
+            <label>
+              <input type="radio" name="rsvp" value="notgoing" [(ngModel)]="pendingStatus" />Not Going
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" (click)="closeChangeStatusModal()">Cancel</button>
+          <button type="button" class="btn-submit" (click)="changeRSVPStatus()">Update</button>
         </div>
       </div>
     </div>

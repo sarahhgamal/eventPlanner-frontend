@@ -1,26 +1,21 @@
 <div class="details-container">
 
   <!-- Loading -->
-  @if (isLoading) {
+  @if (isLoading()) {
     <div class="loading">Loading event...</div>
   } @else if (event) {
     <!-- Back Button -->
     <button class="back-link" (click)="goBack()">← Back to Events</button>
-
-    <!-- Success Message -->
-    @if (successMessage) {
-      <div class="success-alert">{{ successMessage }}</div>
-    }
 
     <!-- Event Card -->
     <div class="event-card">
       <div class="event-title-section">
         <div class="title-and-actions">
             <h1>{{ event.title }}</h1>
-            @if (event.userRole === 'organizer') {
+            @if (isOrganizer) {
                 <div class="organizer-actions">
-                    <button class="btn btn-danger" (click)="deleteEvent()">Delete</button>
-                    <button class="btn btn-primary" (click)="editEvent()">Edit</button>
+                    <button class="btn btn-danger" (click)="openDeleteConfirm()">Delete</button>
+                    <button class="btn btn-primary" (click)="openEditModal()">Edit</button>
                 </div>
             }
         </div>
@@ -35,7 +30,7 @@
         <div class="info-item">
           <span class="info-label row-info-label">📅 Date & Time</span>
           <br/>
-          <span class="info-value">{{ event.date }} at {{ event.time }}</span>
+          <span class="info-value">{{ formatDate(event.date) }} at {{ event.time }}</span>
         </div>
         <div class="info-item">
           <span class="info-label row-info-label">📍 Location</span>
@@ -50,7 +45,7 @@
       </div>
     </div>
 
-    @if (event.userRole === 'organizer') {
+    @if (isOrganizer) {
       <!-- Attendees List -->
       <div class="attendees-card">
         <div class="card-header">
@@ -62,20 +57,17 @@
           @if (event.attendees.length === 0) {
             <p class="no-attendees">No attendees yet. Invite people to your event!</p>
           } @else {
-            @for (attendee of event.attendees; track attendee.id) {
+            @for (attendee of event.attendees; track attendee._id) {
               <div class="attendee-item">
                 <div class="attendee-info">
-                  <div class="attendee-name">{{ attendee.name }}</div>
-                  <div class="attendee-email">{{ attendee.email }}</div>
+                  <div class="attendee-name">{{ attendee.user.name }}</div>
+                  <div class="attendee-email">{{ attendee.user.email }}</div>
                 </div>
 
                 <div class="attendee-actions">
                   <span class="badge" [ngClass]="getStatusBadgeClass(attendee.status)">
-                    {{ getStatusLabel(attendee.status) }}
+                    {{ attendee.status }}
                   </span>
-                  <button class="btn-remove" (click)="removeAttendee(attendee.id)" title="Remove attendee">
-                    ✕
-                  </button>
                 </div>
               </div>
             }
@@ -83,26 +75,12 @@
         </div>
       </div>
 
-      <!-- Delete Confirmation Modal -->
-      @if (showDeleteConfirm) {
-        <div class="modal-overlay" (click)="cancelDelete()">
-          <div class="confirm-modal" (click)="$event.stopPropagation()">
-            <h2>Delete Event?</h2>
-            <p>Are you sure you want to delete <strong>{{ event.title }}</strong>? This action cannot be undone.</p>
-            <div class="modal-actions">
-              <button class="btn btn-secondary" (click)="cancelDelete()">Cancel</button>
-              <button class="btn btn-danger" (click)="confirmDelete()">Delete</button>
-            </div>
-          </div>
-        </div>
-      }
-
       <!-- Invite Modal -->
       @if (showInviteModal) {
         <div class="modal-overlay" (click)="closeInviteModal()">
           <div class="invite-modal" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2>Invite Attendee</h2>
+              <h2>Invite Attendees</h2>
               <button class="modal-close" (click)="closeInviteModal()">✕</button>
             </div>
 
@@ -112,19 +90,52 @@
               }
 
               <div class="form-group">
-                <label class="form-label">Email Address <span class="required">*</span></label>
-                <input
-                  type="email"
+                <label class="form-label">Email Addresses <span class="required">*</span></label>
+                <textarea
                   class="form-input"
-                  [(ngModel)]="inviteEmail"
-                  placeholder="Enter email address" 
-                >
+                  [(ngModel)]="inviteEmails"
+                  placeholder="Enter email addresses (separate with commas, semicolons, or new lines)"
+                  rows="4"
+                ></textarea>
+                <small class="form-hint">You can enter multiple emails separated by commas, semicolons, or new lines</small>
               </div>
             </div>
 
             <div class="modal-footer">
               <button class="btn btn-secondary" (click)="closeInviteModal()">Cancel</button>
-              <button class="btn btn-primary" (click)="sendInvite()">Send Invite</button>
+              <button class="btn btn-primary" (click)="inviteUsers()">Send Invites</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Edit Event Modal -->
+      @if(showEditModal && event) {
+        <app-event-edit 
+          [eventId]="event._id"
+          [eventData]="event"
+          (close)="closeEditModal()"
+          (save)="saveEditedEvent($event)">
+        </app-event-edit>
+      }
+
+      <!-- Delete Event Modal -->
+      @if(showDeleteConfirm && event) {
+        <div class="modal-overlay" (click)="closeDeleteConfirm()">
+          <div class="modal-content sm-modal" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2>Confirm Delete</h2>
+              <button class="modal-close" (click)="closeDeleteConfirm()">✕</button>
+            </div>
+            
+            <div class="modal-body">
+              <p class=form-label>Are you sure you want to delete the event <strong>"{{ event.title }}"</strong>?</p>
+              <p class="warning-text">This action cannot be undone.</p>
+            </div>
+            
+            <div class="modal-footer">
+              <button type="button" class="btn-cancel" (click)="closeDeleteConfirm()">Cancel</button>
+              <button type="button" class="btn-delete-confirm" (click)="confirmDelete()">Delete Event</button>
             </div>
           </div>
         </div>
@@ -132,30 +143,37 @@
     }
 
     <!-- Attendee View -->
-    @if (event.userRole === 'attendee') {
+    @if (!isOrganizer) {
       <!-- RSVP Section -->
       <div class="rsvp-card">
         <h3>Your Response</h3>
         <div class="rsvp-buttons">
           <button
             class="rsvp-btn"
-            [class.active]="event.userRSVP === 'going'"
-            (click)="updateRSVP('going')"
+            [class.active]="currentUserStatus === 'Going'"
+            (click)="updateRSVP('Going')"
           >
             ✓ Going
           </button>
           <button
             class="rsvp-btn"
-            [class.active]="event.userRSVP === 'notgoing'"
-            (click)="updateRSVP('notgoing')"
+            [class.active]="currentUserStatus === 'Maybe'"
+            (click)="updateRSVP('Maybe')"
+          >
+            ? Maybe
+          </button>
+          <button
+            class="rsvp-btn"
+            [class.active]="currentUserStatus === 'Not Going'"
+            (click)="updateRSVP('Not Going')"
           >
             ✕ Not Going
           </button>
         </div>
-        @if (!event.userRSVP) {
+        @if (currentUserStatus === 'Pending') {
           <p class="no-response">You haven't responded yet</p>
         } @else {
-          <p class="response-status">You responded: <strong>{{ getStatusLabel(event.userRSVP) }}</strong></p>
+          <p class="response-status">You responded: <strong>{{ currentUserStatus }}</strong></p>
         }
       </div>
 
@@ -169,6 +187,11 @@
             </div>
 
             <div class="stat">
+                <span class="stat-value">{{ maybeCount }}</span>
+                <span class="stat-label">Maybe</span>
+            </div>
+
+            <div class="stat">
                 <span class="stat-value">{{ pendingCount }}</span>
                 <span class="stat-label">Pending</span>
             </div>
@@ -177,7 +200,7 @@
                 <span class="stat-value">{{ notGoingCount }}</span>
                 <span class="stat-label">Not Going</span>
             </div>
-            </div>
+        </div>
       </div>
     }
   }

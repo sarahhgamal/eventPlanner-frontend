@@ -29,7 +29,7 @@ export interface EventDTO {
 
 export interface CreateEventDto {
   title: string;
-  description?: string;
+  description: string;
   date: string;
   time: string;
   location: string;

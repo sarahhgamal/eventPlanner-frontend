@@ -148,6 +148,37 @@
   box-shadow: 0 4px 12px rgba(33, 28, 132, 0.3);
 }
 
+/* Tabs */
+.tabs-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.3s ease;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+  color: #211C84;
+}
+
+.tab-btn.active {
+  color: #211C84;
+  border-bottom-color: #211C84;
+}
+
 /* Search and Filter Bar */
 .search-filter-bar {
   display: flex;
@@ -251,12 +282,12 @@
   transition: all 0.2s ease;
 }
 
-.btn-edit {
+.btn-edit, .btn-status {
   background: #50589C;
   color: white;
 }
 
-.btn-edit:hover {
+.btn-edit:hover, .btn-status:hover {
   background: #3d4578;
 }
 
@@ -296,6 +327,11 @@
 .badge-notgoing {
   background: #f8d7da;
   color: #721c24;
+}
+
+.badge-pending {
+  background: #e2e3e5;
+  color: #383d41;
 }
 
 .badge-organizer {
@@ -439,6 +475,14 @@
   margin-top: 24px;
 }
 
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 30px;
+  border-top: 1px solid #eee;
+  justify-content: center;
+}
+
 .btn-cancel {
   padding: 10px 24px;
   border: 2px solid #e0e0e0;
@@ -468,8 +512,7 @@
   transform: translateY(-1px);
 }
 
-/* Delete Modal */
-.delete-modal {
+.sm-modal {
   max-width: 450px;
 }
 
@@ -503,6 +546,35 @@
   background: #c82333;
 }
 
+.status-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.status-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-options label:hover {
+  border-color: #50589C;
+  background: #f9f9f9;
+}
+
+.status-options input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .content-wrapper {
@@ -513,6 +585,15 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 20px;
+  }
+  
+  .tabs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tab-btn {
+    white-space: nowrap;
   }
   
   .search-filter-bar {

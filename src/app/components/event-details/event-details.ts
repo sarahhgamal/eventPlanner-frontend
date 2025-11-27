@@ -1,23 +1,29 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EventDTO, Attendee, UpdateStatusDto, InviteUsersDto } from '../../models/event.models';
 import { AuthService } from '../../services/auth/auth';
 import { EventService } from '../../services/event/event.service';
+import { EventEdit } from '../event-edit/event-edit';
 
 @Component({
   selector: 'app-event-details',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, EventEdit],
   templateUrl: './event-details.html',
   styleUrl: './event-details.css',
 })
 export class EventDetails implements OnInit {
   event: EventDTO | null = null;
-  isLoading = true;
+  isLoading = signal<boolean>(true);
   isOrganizer = false;
   currentUserStatus: string = 'Pending';
+
+  // Modals
+  showEditModal = false;
+  showDeleteConfirm = false;
+  showChangeStatusModal = false;
 
   // Invite modal
   showInviteModal = false;
@@ -45,43 +51,47 @@ export class EventDetails implements OnInit {
     }
   }
 
-  loadEventDetails(eventId: string) {
-    this.isLoading = true;
-    this.eventService.getEventById(eventId).subscribe({
-      next: (response) => {
-        if (response.event) {
-          this.event = response.event;
-          this.checkUserRole();
-        }
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading event details:', error);
-        this.isLoading = false;
-        if (error.status === 403) {
-          alert('You do not have access to this event');
-          this.router.navigate(['/events']);
-        } else if (error.status === 401) {
-          this.authService.logout();
-          this.router.navigate(['/auth']);
-        } else {
-          alert('Failed to load event details');
-          this.router.navigate(['/events']);
-        }
-      },
-    });
-  }
+loadEventDetails(eventId: string) {
+  console.log('Loading event details for:', eventId);
+  this.isLoading.set(true);
+  this.eventService.getEventById(eventId).subscribe({
+    next: (response) => {
+      if (response.event) {
+        this.event = response.event;
+        this.checkUserRole();
+      }
+      this.isLoading.set(false);
+      console.log('isLoading set to false');
+    },
+    error: (error) => {
+      console.error('Error loading event details:', error);
+      this.isLoading.set(false);
+      if (error.status === 403) {
+        alert('You do not have access to this event');
+        this.router.navigate(['/event-list']);
+      } else if (error.status === 401) {
+        this.authService.logout();
+        this.router.navigate(['/auth']);
+      } else {
+        alert('Failed to load event details');
+        this.router.navigate(['/event-list']);
+      }
+    },
+  });
+}
 
   checkUserRole() {
     if (!this.event) return;
 
-    // Get current user from token or from attendees list
-    const currentUserAttendee = this.event.attendees.find((att) => att.role === 'organizer');
+    const currentUserId = this.authService.getCurrentUserId();
+    const currentUserAttendee = this.event.attendees.find((att) => att.user._id === currentUserId);
 
     if (currentUserAttendee) {
-      this.isOrganizer = currentUserAttendee.role === 'organizer';
       this.currentUserStatus = currentUserAttendee.status;
+    } else {
+      this.currentUserStatus = 'Pending';
     }
+    this.isOrganizer = this.event.organizer._id === currentUserId;
   }
 
   // Update RSVP status (for attendees only)
@@ -208,31 +218,55 @@ export class EventDetails implements OnInit {
 
   // Navigate back to events list
   goBack() {
-    this.router.navigate(['/events']);
+    this.router.navigate(['/event-list']);
   }
 
-  // Edit event (organizer only)
-  editEvent() {
-    if (!this.event || !this.isOrganizer) return;
-    this.router.navigate(['/events', this.event._id, 'edit']);
+  openEditModal() {
+    this.showEditModal = true;
   }
 
-  // Delete event (organizer only)
-  deleteEvent() {
+  closeEditModal() {
+    this.showEditModal = false;
+  }
+
+  saveEditedEvent(eventData: any) {
     if (!this.event || !this.isOrganizer) return;
 
-    if (confirm('Are you sure you want to delete this event?')) {
-      this.eventService.deleteEvent(this.event._id).subscribe({
+    const eventId = this.event._id;
+    this.eventService.updateEvent(eventId, eventData).subscribe({
+      next: (response) => {
+        console.log('Event updated successfully:', response);
+        this.loadEventDetails(eventId);
+        this.closeEditModal();
+      },
+      error: (error) => {
+        console.error('Error updating event:', error);
+        alert('Failed to update event. Please try again.');
+      },
+    });
+    
+  }
+
+  openDeleteConfirm() {
+    this.showDeleteConfirm = true;
+  }
+
+  closeDeleteConfirm() {
+    this.showDeleteConfirm = false;
+  }
+
+  confirmDelete() {
+    if (!this.event || !this.isOrganizer) return;
+
+    this.eventService.deleteEvent(this.event._id).subscribe({
         next: () => {
-          alert('Event deleted successfully');
-          this.router.navigate(['/events']);
+          this.router.navigate(['/event-list']);
         },
         error: (error) => {
           console.error('Error deleting event:', error);
           alert('Failed to delete event');
         },
       });
-    }
   }
 
   // Format date for display
@@ -253,5 +287,25 @@ export class EventDetails implements OnInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return eventDate < today;
+  }
+
+  get goingCount(): number {
+    return this.event?.attendees.filter(a => a.status === 'Going').length || 0;
+  }
+
+  get maybeCount(): number {
+    return this.event?.attendees.filter(a => a.status === 'Maybe').length || 0;
+  }
+
+  get pendingCount(): number {
+    return this.event?.attendees.filter(a => a.status === 'Pending').length || 0;
+  }
+
+  get notGoingCount(): number {
+    return this.event?.attendees.filter(a => a.status === 'Not Going').length || 0;
+  }
+
+  trackByAttendeeId(index: number, attendee: Attendee) {
+    return attendee._id;
   }
 }

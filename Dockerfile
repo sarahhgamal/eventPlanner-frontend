@@ -14,30 +14,21 @@ FROM nginx:alpine
 
 COPY --from=build /app/dist/eventPlanner-frontend/browser /usr/share/nginx/html
 
-RUN echo 'client_body_temp_path /tmp/nginx/client_temp; \
-proxy_temp_path /tmp/nginx/proxy_temp; \
-fastcgi_temp_path /tmp/nginx/fastcgi_temp; \
-uwsgi_temp_path /tmp/nginx/uwsgi_temp; \
-scgi_temp_path /tmp/nginx/scgi_temp; \
-pid /tmp/nginx.pid; \
-events {} \
-http { \
-  include /etc/nginx/mime.types; \
-  server { \
-    listen 8080; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-      try_files $uri $uri/ /index.html; \
-    } \
-    location /api/ { \
-      proxy_pass http://backend:3003/api/; \
-      proxy_set_header Host $host; \
-      proxy_set_header X-Real-IP $remote_addr; \
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
-    } \
-  } \
-}' > /etc/nginx/nginx.conf
+# custom nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# writable directories for nginx temporary files
+RUN mkdir -p /tmp/nginx_client_temp /tmp/nginx_proxy_temp /tmp/nginx_fastcgi_temp \
+    /tmp/nginx_uwsgi_temp /tmp/nginx_scgi_temp && \
+    # set permissions for OpenShift
+    chmod -R 777 /tmp && \
+    chmod -R 755 /usr/share/nginx/html && \
+    chown -R nginx:nginx /usr/share/nginx/html && \
+    touch /tmp/nginx.pid && \
+    chmod 666 /tmp/nginx.pid
+
+# switch to non-root user
+USER nginx
 
 EXPOSE 8080
 

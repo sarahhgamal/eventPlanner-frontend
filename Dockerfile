@@ -30,7 +30,9 @@ RUN echo 'server { \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
         proxy_set_header X-Forwarded-Proto $scheme; \
     } \
-}' > /etc/nginx/conf.d/default.conf
+}' > /etc/nginx/conf.d/default.conf && \
+    sed -i 's|/var/cache/nginx|/tmp/nginx|g' /etc/nginx/nginx.conf && \
+    sed -i 's|pid /var/run/nginx.pid|pid /tmp/nginx.pid|g' /etc/nginx/nginx.conf
 
 EXPOSE 8080
 

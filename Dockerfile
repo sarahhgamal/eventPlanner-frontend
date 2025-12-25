@@ -14,25 +14,30 @@ FROM nginx:alpine
 
 COPY --from=build /app/dist/eventPlanner-frontend/browser /usr/share/nginx/html
 
-RUN echo 'server { \
+RUN echo 'client_body_temp_path /tmp/nginx/client_temp; \
+proxy_temp_path /tmp/nginx/proxy_temp; \
+fastcgi_temp_path /tmp/nginx/fastcgi_temp; \
+uwsgi_temp_path /tmp/nginx/uwsgi_temp; \
+scgi_temp_path /tmp/nginx/scgi_temp; \
+pid /tmp/nginx.pid; \
+events {} \
+http { \
+  include /etc/nginx/mime.types; \
+  server { \
     listen 8080; \
+    root /usr/share/nginx/html; \
+    index index.html; \
     location / { \
-        root /usr/share/nginx/html; \
-        try_files $uri $uri/ /index.html; \
+      try_files $uri $uri/ /index.html; \
     } \
     location /api/ { \
-        proxy_pass http://backend:3003/api/; \
-        proxy_http_version 1.1; \
-        proxy_set_header Upgrade $http_upgrade; \
-        proxy_set_header Connection "upgrade"; \
-        proxy_set_header Host $host; \
-        proxy_set_header X-Real-IP $remote_addr; \
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
-        proxy_set_header X-Forwarded-Proto $scheme; \
+      proxy_pass http://backend:3003/api/; \
+      proxy_set_header Host $host; \
+      proxy_set_header X-Real-IP $remote_addr; \
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
     } \
-}' > /etc/nginx/conf.d/default.conf && \
-    sed -i 's|/var/cache/nginx|/tmp/nginx|g' /etc/nginx/nginx.conf && \
-    sed -i 's|pid /var/run/nginx.pid|pid /tmp/nginx.pid|g' /etc/nginx/nginx.conf
+  } \
+}' > /etc/nginx/nginx.conf
 
 EXPOSE 8080
 
